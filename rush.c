@@ -2,18 +2,20 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-int main(int argc, char** argv) {
-	printf("hello world (pid:%d)\n", getpid());
+#define cmdLen 256
 
-	int rc = fork();
-	if (rc < 0) { // fork failed; exit
-	fprintf(stderr, "fork failed\n");
-	exit(1);
-	} else if (rc == 0) { // child (new process)
-	printf("hello, I am child (pid:%d)\n", (int) getpid());
-	} else { // parent goes down this path (main)
-	printf("hello, I am parent of %d (pid:%d)\n",
-	rc, (int) getpid());
+int main(int argc, char** argv) {
+	// buffer for cmd input
+	char* cmd = (char *)malloc(cmdLen * sizeof(char));
+	size_t cmdSize = cmdLen;
+	if(cmd == NULL) {
+		perror("Unable to allocate space for command input.");
+		return 1;
+	}
+
+	while(1) {
+		printf("rush> ");
+		getline(&cmd, &cmdSize, stdin);
 	}
 
 	return 0;
