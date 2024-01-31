@@ -31,12 +31,9 @@ int main(int argc, char** argv) {
 
         // check if command is built in first
         if (strcmp(cmd, "exit") == 0) {
-            free(cmd); // Free the dynamically allocated memory
             exit(0);
         }
     }
-
-    free(cmd); // Free the dynamically allocated memory
 
     return 0;
 }
