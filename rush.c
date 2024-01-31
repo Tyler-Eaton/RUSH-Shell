@@ -1,22 +1,42 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-
-#define cmdLen 256
+#include <string.h>
 
 int main(int argc, char** argv) {
-	// buffer for cmd input
-	char* cmd = (char *)malloc(cmdLen * sizeof(char));
-	size_t cmdSize = cmdLen;
-	if(cmd == NULL) {
-		perror("Unable to allocate space for command input.");
-		return 1;
-	}
+    // buffer for cmd input
+    char* cmd = NULL;
+    char* token = NULL;
+    size_t cmdSize = 0;
 
-	while(1) {
-		printf("rush> ");
-		getline(&cmd, &cmdSize, stdin);
-	}
+    // calling rush with arguments causes an error
+    if (argc > 1) {
+        printf("An error has occurred\n");
+        return 1;
+    }
 
-	return 0;
+    while (1) {
+        // prompt user for input and get that input and store in buffer
+        printf("rush> ");
+        if (getline(&cmd, &cmdSize, stdin) == -1) {
+            // Handle error or EOF
+            break;
+        }
+
+        // Tokenize the command
+        token = strtok(cmd, " \n\t");
+        while (token != NULL) {
+            printf("%s\n", token);
+            token = strtok(NULL, " \n\t");
+        }
+
+        // check if command is built in first
+        if (strcmp(cmd, "exit") == 0) {
+            free(cmd); // Free the dynamically allocated memory
+            exit(0);
+        }
+    }
+
+    free(cmd); // Free the dynamically allocated memory
+
+    return 0;
 }
