@@ -11,13 +11,13 @@ void printError() {
 
 int main(int argc, char** argv) {
 
-
     // buffer for cmd input
     char* cmd = NULL;
     char* token = NULL;
     size_t cmdSize = 0;
 	size_t tokenCount = 0;
 	char** arguments = NULL;
+	char** path = NULL;
 
     // calling rush with arguments causes an error
     if (argc > 1) {
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 			exit(1);
         }
 
-		// tokenize the input
+		// parse input command and store into array of strings
         char* temp = cmd;
 		tokenCount = 0;
         while ((token = strsep(&temp, " \n\t")) != NULL) {
@@ -44,6 +44,7 @@ int main(int argc, char** argv) {
             }
         }
 
+		// ensure that arguments were passed
 		if(tokenCount > 0) {
 			// check if command is built in first
 			if (strcmp(arguments[0], "exit") == 0) {
@@ -51,6 +52,20 @@ int main(int argc, char** argv) {
 					printError();
 				} else {
 					exit(0);
+				}
+			} else if (strcmp(arguments[0], "cd") == 0) {
+				if(tokenCount != 2) {
+					printError();
+				} else {
+					int dir = chdir(arguments[1]);
+					if(dir == -1) {
+						printError();
+					}
+				}
+			} else if (strcmp(arguments[0], "path") == 0) {
+				path = (char**)realloc(path, (tokenCount - 1) * sizeof(char*));
+				for(int i = 1; i < tokenCount; i++) {
+					path[i-1] = arguments[i];
 				}
 			}
 		}
