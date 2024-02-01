@@ -16,6 +16,8 @@ int main(int argc, char** argv) {
     char* cmd = NULL;
     char* token = NULL;
     size_t cmdSize = 0;
+	size_t tokenCount = 0;
+	char** arguments = NULL;
 
     // calling rush with arguments causes an error
     if (argc > 1) {
@@ -31,17 +33,27 @@ int main(int argc, char** argv) {
 			exit(1);
         }
 
-        // Tokenize the command
-        token = strtok(cmd, " \n\t");
-        while (token != NULL) {
-            printf("%s\n", token);
-            token = strtok(NULL, " \n\t");
+		// tokenize the input
+        char* temp = cmd;
+		tokenCount = 0;
+        while ((token = strsep(&temp, " \n\t")) != NULL) {
+            if (strlen(token) > 0) {
+				tokenCount++;
+                arguments = (char**)realloc(arguments, tokenCount * sizeof(char*));
+                arguments[tokenCount - 1] = strdup(token);
+            }
         }
 
-        // check if command is built in first
-        if (strcmp(cmd, "exit") == 0) {
-            exit(0);
-        }
+		if(tokenCount > 0) {
+			// check if command is built in first
+			if (strcmp(arguments[0], "exit") == 0) {
+				if(tokenCount > 1) {
+					printError();
+				} else {
+					exit(0);
+				}
+			}
+		}
     }
 
     return 0;
