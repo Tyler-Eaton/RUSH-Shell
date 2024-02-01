@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 	size_t argCount = 0;
 	size_t pathCount = 1;
 	char ***arguments = NULL;
-	int* argCounts = NULL;
+	int *argCounts = NULL;
 	// allocate space for path and set initial path to /bin
 	char **path = (char **)malloc(sizeof(char *));
 	path[0] = "/bin";
@@ -66,18 +66,19 @@ int main(int argc, char **argv)
 		{
 			if (strlen(arg) > 0)
 			{
-				if(arg[0] == '&') {
-					argCounts = (int*)realloc(argCounts, (argIdx + 1) * sizeof(int));
-					argCounts[argIdx] = argCount;
+				if (arg[0] == '&')
+				{
 					argIdx++;
 					argCount = 0;
 					continue;
 				}
 				argCount++;
-				arguments = (char ***)realloc(arguments, (argIdx + 1) * sizeof(char **));
-				arguments[argIdx] = (char**)realloc(arguments[argIdx], argCount * sizeof(char*));
-				arguments[argIdx][argCount-1] = (char*)realloc(arguments[argIdx][argCount-1], 50*sizeof(char));
-				arguments[argIdx][argCount-1] = strdup(arg);
+				arguments = (char ***)realloc(arguments, 100 * sizeof(char **));
+				arguments[argIdx] = (char **)realloc(arguments[argIdx], 100 * sizeof(char *));
+				arguments[argIdx][argCount - 1] = (char *)realloc(arguments[argIdx][argCount - 1], 100 * sizeof(char));
+				arguments[argIdx][argCount - 1] = strdup(arg);
+				argCounts = (int *)realloc(argCounts, (argIdx + 1) * sizeof(int));
+				argCounts[argIdx] = argCount;
 			}
 		}
 
@@ -113,12 +114,12 @@ int main(int argc, char **argv)
 			}
 			else if (strcmp(arguments[0][0], "path") == 0)
 			{
-				path = (char **)realloc(path, (argCounts[0] - 1) * sizeof(char *));
-				for (int i = 1; i < argCounts[0]; i++)
+				path = (char **)realloc(path, (argCount - 1) * sizeof(char *));
+				for (int i = 1; i < argCount; i++)
 				{
 					path[i - 1] = arguments[0][i];
 				}
-				pathCount = argCounts[0] - 1;
+				pathCount = argCount - 1;
 			}
 			else
 			{
@@ -167,8 +168,8 @@ int main(int argc, char **argv)
 										else
 										{
 											int fd = open(arguments[i][redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
-											dup2(fd, STDOUT_FILENO);													  // Redirect stdout to the file
-											close(fd);																	  // Close the file descriptor
+											dup2(fd, STDOUT_FILENO);														 // Redirect stdout to the file
+											close(fd);																		 // Close the file descriptor
 											arguments[i][redirIndex] = NULL;
 											arguments[i][redirIndex + 1] = NULL;
 										}
@@ -217,18 +218,19 @@ int main(int argc, char **argv)
 					--numCmds;
 				}
 			}
-		}
 
-		// clear arguments after process has run
-		for(int i = 0; i < argIdx + 1; i++) {
-			for (int j = 0; j < argCounts[i]; j++)
+			// clear arguments after process has run
+			for (int i = 0; i < argIdx + 1; i++)
+			{
+				for (int j = 0; j < argCounts[i]; j++)
 				{
 					arguments[i][j] = NULL;
 				}
+				arguments[i] = NULL;
+			}
+			arguments = NULL;
+			argCounts = NULL;
 		}
-		arguments = NULL;
-		argCounts = NULL;
-
 	}
 
 	return 0;
