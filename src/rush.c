@@ -27,29 +27,16 @@ int findRedirectionIndex(char **args, int argCount)
 	return -1;
 }
 
-int countParallelCmds(char **args, int argCount)
-{
-	int cnt = 0;
-	for (int i = 0; i < argCount; i++)
-	{
-		if (strcmp(args[i], "&") == 0)
-		{
-			cnt++;
-		}
-	}
-	return cnt;
-}
-
 int main(int argc, char **argv)
 {
-
 	// buffer for cmd input
 	char *cmd = NULL;
 	char *arg = NULL;
 	size_t cmdSize = 0;
 	size_t argCount = 0;
 	size_t pathCount = 1;
-	char **arguments = NULL;
+	char ***arguments = NULL;
+	int* argCounts = NULL;
 	// allocate space for path and set initial path to /bin
 	char **path = (char **)malloc(sizeof(char *));
 	path[0] = "/bin";
@@ -74,13 +61,23 @@ int main(int argc, char **argv)
 		// parse input command and store into array of strings
 		char *temp = cmd;
 		argCount = 0;
+		int argIdx = 0;
 		while ((arg = strsep(&temp, " \n\t")) != NULL)
 		{
 			if (strlen(arg) > 0)
 			{
+				if(arg[0] == '&') {
+					argCounts = (int*)realloc(argCounts, (argIdx + 1) * sizeof(int));
+					argCounts[argIdx] = argCount;
+					argIdx++;
+					argCount = 0;
+					continue;
+				}
 				argCount++;
-				arguments = (char **)realloc(arguments, argCount * sizeof(char *));
-				arguments[argCount - 1] = strdup(arg);
+				arguments = (char ***)realloc(arguments, (argIdx + 1) * sizeof(char **));
+				arguments[argIdx] = (char**)realloc(arguments[argIdx], argCount * sizeof(char*));
+				arguments[argIdx][argCount-1] = (char*)realloc(arguments[argIdx][argCount-1], 50*sizeof(char));
+				arguments[argIdx][argCount-1] = strdup(arg);
 			}
 		}
 
@@ -88,7 +85,7 @@ int main(int argc, char **argv)
 		if (argCount > 0)
 		{
 			// check if command is built in first
-			if (strcmp(arguments[0], "exit") == 0)
+			if (strcmp(arguments[0][0], "exit") == 0)
 			{
 				if (argCount > 1)
 				{
@@ -99,7 +96,7 @@ int main(int argc, char **argv)
 					exit(0);
 				}
 			}
-			else if (strcmp(arguments[0], "cd") == 0)
+			else if (strcmp(arguments[0][0], "cd") == 0)
 			{
 				if (argCount != 2)
 				{
@@ -107,25 +104,25 @@ int main(int argc, char **argv)
 				}
 				else
 				{
-					int dir = chdir(arguments[1]);
+					int dir = chdir(arguments[0][1]);
 					if (dir == -1)
 					{
 						printError();
 					}
 				}
 			}
-			else if (strcmp(arguments[0], "path") == 0)
+			else if (strcmp(arguments[0][0], "path") == 0)
 			{
-				path = (char **)realloc(path, (argCount - 1) * sizeof(char *));
-				for (int i = 1; i < argCount; i++)
+				path = (char **)realloc(path, (argCounts[0] - 1) * sizeof(char *));
+				for (int i = 1; i < argCounts[0]; i++)
 				{
-					path[i - 1] = arguments[i];
+					path[i - 1] = arguments[0][i];
 				}
-				pathCount = argCount - 1;
+				pathCount = argCounts[0] - 1;
 			}
 			else
 			{
-				int numCmds = countParallelCmds(arguments, argCount) + 1;
+				int numCmds = argIdx + 1;
 				pid_t pids[numCmds];
 
 				for (int i = 0; i < numCmds; i++)
@@ -138,11 +135,11 @@ int main(int argc, char **argv)
 					else if (pids[i] == 0)
 					{
 						int flag = 0;
-						for (int i = 0; i < pathCount; i++)
+						for (int j = 0; j < pathCount; j++)
 						{
-							char *res = strdup(path[i]);
+							char *res = strdup(path[j]);
 							strcat(res, "/");
-							strcat(res, arguments[0]);
+							strcat(res, arguments[i][0]);
 							int canAccess = access(res, X_OK);
 							if (canAccess == 0)
 							{
@@ -157,37 +154,37 @@ int main(int argc, char **argv)
 								// child process exec command
 								else if (pid == 0)
 								{
-									int redirIndex = findRedirectionIndex(arguments, argCount);
+									int redirIndex = findRedirectionIndex(arguments[i], argCounts[i]);
 									// check that redirection symbol is inputted
 									if (redirIndex > 0)
 									{
 										// ensure that only 1 argument after is inputted
-										if (argCount - (redirIndex + 1) != 1)
+										if (argCounts[i] - (redirIndex + 1) != 1)
 										{
 											printError();
 											exit(1);
 										}
 										else
 										{
-											int fd = open(arguments[redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
+											int fd = open(arguments[i][redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
 											dup2(fd, STDOUT_FILENO);													  // Redirect stdout to the file
 											close(fd);																	  // Close the file descriptor
-											arguments[redirIndex] = NULL;
-											arguments[redirIndex + 1] = NULL;
+											arguments[i][redirIndex] = NULL;
+											arguments[i][redirIndex + 1] = NULL;
 										}
 									}
 									else
 									{
-										for (int i = 0; i < argCount; i++)
+										for (int h = 0; h < argCounts[i]; h++)
 										{
-											if (arguments[i][0] == '>')
+											if (arguments[i][j][0] == '>')
 											{
 												printError();
 												exit(1);
 											}
 										}
 									}
-									int error = execv(res, arguments);
+									int error = execv(res, arguments[i]);
 									if (error == -1)
 									{
 										printError();
@@ -207,6 +204,7 @@ int main(int argc, char **argv)
 						{
 							printError();
 						}
+						exit(0);
 					}
 				}
 
@@ -222,10 +220,15 @@ int main(int argc, char **argv)
 		}
 
 		// clear arguments after process has run
-		for (int i = 0; i < argCount; i++)
-		{
-			arguments[i] = NULL;
+		for(int i = 0; i < argIdx + 1; i++) {
+			for (int j = 0; j < argCounts[i]; j++)
+				{
+					arguments[i][j] = NULL;
+				}
 		}
+		arguments = NULL;
+		argCounts = NULL;
+
 	}
 
 	return 0;
