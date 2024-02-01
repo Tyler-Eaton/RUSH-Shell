@@ -52,6 +52,7 @@ int main(int argc, char **argv)
 	{
 		// prompt user for input and get that input and store in buffer
 		printf("rush> ");
+		fflush(stdout);
 		if (getline(&cmd, &cmdSize, stdin) == -1)
 		{
 			printError();
