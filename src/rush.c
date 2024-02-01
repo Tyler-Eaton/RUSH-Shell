@@ -27,6 +27,19 @@ int findRedirectionIndex(char **args, int argCount)
 	return -1;
 }
 
+int countParallelCmds(char **args, int argCount)
+{
+	int cnt = 0;
+	for (int i = 0; i < argCount; i++)
+	{
+		if (strcmp(args[i], "&") == 0)
+		{
+			cnt++;
+		}
+	}
+	return cnt;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -112,75 +125,98 @@ int main(int argc, char **argv)
 			}
 			else
 			{
-				int flag = 0;
-				for (int i = 0; i < pathCount; i++)
+				int numCmds = countParallelCmds(arguments, argCount) + 1;
+				pid_t pids[numCmds];
+
+				for (int i = 0; i < numCmds; i++)
 				{
-					char *res = strdup(path[i]);
-					strcat(res, "/");
-					strcat(res, arguments[0]);
-					int canAccess = access(res, X_OK);
-					if (canAccess == 0)
+					if ((pids[i] = fork()) < 0)
 					{
-						flag = 1;
-						pid_t pid = fork();
-						// check if fork failed
-						if (pid == -1)
+						printError();
+						exit(1);
+					}
+					else if (pids[i] == 0)
+					{
+						int flag = 0;
+						for (int i = 0; i < pathCount; i++)
 						{
-							printError();
-							break;
-						}
-						// child process exec command
-						else if (pid == 0)
-						{
-							int redirIndex = findRedirectionIndex(arguments, argCount);
-							// check that redirection symbol is inputted
-							if (redirIndex > 0)
+							char *res = strdup(path[i]);
+							strcat(res, "/");
+							strcat(res, arguments[0]);
+							int canAccess = access(res, X_OK);
+							if (canAccess == 0)
 							{
-								// ensure that only 1 argument after is inputted
-								if (argCount - (redirIndex + 1) != 1)
+								flag = 1;
+								pid_t pid = fork();
+								// check if fork failed
+								if (pid == -1)
 								{
 									printError();
-									exit(1);
+									break;
 								}
-								else
+								// child process exec command
+								else if (pid == 0)
 								{
-									int fd = open(arguments[redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
-									dup2(fd, STDOUT_FILENO);													  // Redirect stdout to the file
-									close(fd);																	  // Close the file descriptor
-									arguments[redirIndex] = NULL;
-									arguments[redirIndex + 1] = NULL;
-								}
-							}
-							else
-							{
-								for (int i = 0; i < argCount; i++)
-								{
-									if (arguments[i][0] == '>')
+									int redirIndex = findRedirectionIndex(arguments, argCount);
+									// check that redirection symbol is inputted
+									if (redirIndex > 0)
+									{
+										// ensure that only 1 argument after is inputted
+										if (argCount - (redirIndex + 1) != 1)
+										{
+											printError();
+											exit(1);
+										}
+										else
+										{
+											int fd = open(arguments[redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
+											dup2(fd, STDOUT_FILENO);													  // Redirect stdout to the file
+											close(fd);																	  // Close the file descriptor
+											arguments[redirIndex] = NULL;
+											arguments[redirIndex + 1] = NULL;
+										}
+									}
+									else
+									{
+										for (int i = 0; i < argCount; i++)
+										{
+											if (arguments[i][0] == '>')
+											{
+												printError();
+												exit(1);
+											}
+										}
+									}
+									int error = execv(res, arguments);
+									if (error == -1)
 									{
 										printError();
 										exit(1);
 									}
 								}
-							}
-							int error = execv(res, arguments);
-							if (error == -1)
-							{
-								printError();
-								exit(1);
+								// parent should wait for child to finish and break out of loop
+								else
+								{
+									int status;
+									waitpid(pid, &status, 0);
+									break;
+								}
 							}
 						}
-						// parent should wait for child to finish and break out of loop
-						else
+						if (flag == 0)
 						{
-							int status;
-							waitpid(pid, &status, 0);
-							break;
+							printError();
 						}
 					}
 				}
-				if (flag == 0)
+
+				/* Wait for children to exit. */
+				int status;
+				pid_t p;
+				while (numCmds > 0)
 				{
-					printError();
+					p = wait(&status);
+					--numCmds;
 				}
 			}
 		}
