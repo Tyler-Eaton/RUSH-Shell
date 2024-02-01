@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
 								// ensure that only 1 argument after is inputted
 								if(argCount - (redirIndex + 1) != 1) {
 									printError();
+									exit(1);
 								} else {
 									int fd = open(arguments[redirIndex+1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
 									dup2(fd, STDOUT_FILENO); // Redirect stdout to the file
@@ -116,7 +117,11 @@ int main(int argc, char** argv) {
 									arguments[redirIndex+1] = NULL;
 								}
 							}
-							execv(res, arguments);
+							int error = execv(res, arguments);
+							if(error == -1) {
+								printError();
+								exit(1);
+							}
 						}
 						// parent should wait for child to finish and break out of loop
 						else {
@@ -130,9 +135,9 @@ int main(int argc, char** argv) {
 					printError();
 				}
 			}
-
 		}
 
+		// clear arguments after process has run
 		for(int i = 0; i < argCount; i++) {
 			arguments[i] = NULL;
 		}
