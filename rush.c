@@ -4,11 +4,23 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
+// print error message to user
 void printError() {
 	char error_message[30] = "An error has occurred\n";
 	write(STDERR_FILENO, error_message, strlen(error_message));
     fflush(stdout);
+}
+
+// return the index of redirection symbol in arg list
+int findRedirectionIndex(char** args, int argCount) {
+	for(int i = 0; i < argCount; i++) {
+		if(strcmp(args[i], ">") == 0) {
+			return i;
+		}
+	}
+	return 0;
 }
 
 int main(int argc, char** argv) {
@@ -90,6 +102,20 @@ int main(int argc, char** argv) {
 						}
 						// child process exec command
 						else if(pid == 0) {
+							int redirIndex = findRedirectionIndex(arguments, argCount);
+							// check that redirection symbol is inputted
+							if(redirIndex > 0) {
+								// ensure that only 1 argument after is inputted
+								if(argCount - (redirIndex + 1) != 1) {
+									printError();
+								} else {
+									int fd = open(arguments[redirIndex+1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
+									dup2(fd, STDOUT_FILENO); // Redirect stdout to the file
+        							close(fd); // Close the file descriptor
+									arguments[redirIndex] = NULL;
+									arguments[redirIndex+1] = NULL;
+								}
+							}
 							execv(res, arguments);
 						}
 						// parent should wait for child to finish and break out of loop
@@ -104,6 +130,11 @@ int main(int argc, char** argv) {
 					printError();
 				}
 			}
+
+		}
+
+		for(int i = 0; i < argCount; i++) {
+			arguments[i] = NULL;
 		}
     }
 
