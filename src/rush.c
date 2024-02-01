@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 									{
 										for (int h = 0; h < argCounts[i]; h++)
 										{
-											if (arguments[i][j][0] == '>')
+											if (arguments[i][h][0] == '>')
 											{
 												printError();
 												exit(1);
