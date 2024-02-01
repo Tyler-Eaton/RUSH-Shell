@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 				}
 				argCount++;
 				arguments = (char ***)realloc(arguments, (argIdx + 1) * sizeof(char **));
-				arguments[argIdx] = (char **)realloc(arguments[argIdx], argCount + 10 * sizeof(char *));
+				arguments[argIdx] = (char **)realloc(arguments[argIdx], 50 * sizeof(char *));
 				arguments[argIdx][argCount - 1] = (char *)realloc(arguments[argIdx][argCount - 1], 50 * sizeof(char));
 				arguments[argIdx][argCount - 1] = strdup(arg);
 				argCounts = (int *)realloc(argCounts, (argIdx + 1) * sizeof(int));
