@@ -1,8 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+void printError() {
+	char error_message[30] = "An error has occurred\n";
+	write(STDERR_FILENO, error_message, strlen(error_message));
+    fflush(stdout);
+}
 
 int main(int argc, char** argv) {
+
+
     // buffer for cmd input
     char* cmd = NULL;
     char* token = NULL;
@@ -10,16 +19,16 @@ int main(int argc, char** argv) {
 
     // calling rush with arguments causes an error
     if (argc > 1) {
-        printf("An error has occurred\n");
-        return 1;
+		printError();
+		exit(1);
     }
 
     while (1) {
         // prompt user for input and get that input and store in buffer
         printf("rush> ");
         if (getline(&cmd, &cmdSize, stdin) == -1) {
-            // Handle error or EOF
-            break;
+			printError();
+			exit(1);
         }
 
         // Tokenize the command
