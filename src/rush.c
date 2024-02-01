@@ -114,7 +114,7 @@ int main(int argc, char **argv)
 			}
 			else if (strcmp(arguments[0][0], "path") == 0)
 			{
-				path = (char **)realloc(path, (argCount - 1) * sizeof(char *));
+				path = (char **)realloc(path, argCount * sizeof(char *));
 				for (int i = 1; i < argCount; i++)
 				{
 					path[i - 1] = arguments[0][i];
