@@ -6,11 +6,11 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
-#define MAX_ARGS 50
-#define MAX_ARG_LENGTH 50
+#define MAX_CMDS 10
+#define MAX_ARGS_PER_CMD 16
 
 // return the index of redirection symbol in arg list
-int findRedirectionIndex(char **args, int argCount)
+int findRedirectionIndex(char **args, const int argCount)
 {
 	for (int i = 0; i < argCount; i++)
 	{
@@ -39,12 +39,14 @@ int main(int argc, char **argv)
     int argIdx = 0;
     char *cmd = NULL;
     char *arg = NULL;
-    int *argCounts = NULL;
-    char*** arguments = NULL;
+    int argCounts[MAX_CMDS];
     char **path = (char **)malloc(sizeof(char *));
     path[0] = "/bin";
 
-	// calling rush with arguments causes an error
+    // create 2d array of strings to store commands and args from user input
+    char *(*arguments)[MAX_ARGS_PER_CMD] = malloc(sizeof(*arguments) * MAX_CMDS);
+
+    // calling rush with arguments causes an error
 	if (argc > 1)
 	{
 		printError();
@@ -68,6 +70,7 @@ int main(int argc, char **argv)
         // parse the cmd into tokens and store each token in array
 		char *temp = cmd;
 		argCount = 0;
+        argIdx = 0;
 		while ((arg = strsep(&temp, " \n\t")) != NULL)
 		{
 			if (strlen(arg) > 0)
@@ -78,15 +81,9 @@ int main(int argc, char **argv)
 					argCount = 0;
 					continue;
 				}
-				argCount++;
-
-                // resize arrays as arguments are parsed and store args into arrays
-                arguments = (char***)realloc(arguments, (argIdx + 1) * sizeof(char **));
-				arguments[argIdx] = (char **)realloc(arguments[argIdx], MAX_ARGS * sizeof(char *));
-				arguments[argIdx][argCount - 1] = (char *)realloc(arguments[argIdx][argCount - 1], MAX_ARG_LENGTH * sizeof(char));
-				arguments[argIdx][argCount - 1] = strdup(arg);
-				argCounts = (int *)realloc(argCounts, (argIdx + 1) * sizeof(int));
-				argCounts[argIdx] = argCount;
+				arguments[argIdx][argCount] = strdup(arg);
+                argCount++;
+                argCounts[argIdx] = argCount;
 			}
 		}
 
@@ -235,17 +232,15 @@ int main(int argc, char **argv)
 				}
 			}
 
-			// set arguments to NULL to use again in the next iteration
+			//set arguments to NULL to use again in the next iteration
 			for (int i = 0; i < argIdx + 1; i++)
 			{
 				for (int j = 0; j < argCounts[i]; j++)
 				{
 					arguments[i][j] = NULL;
 				}
-				arguments[i] = NULL;
+                argCounts[i] = 0;
 			}
-			arguments = NULL;
-			argCounts = NULL;
 		}
 	}
 
