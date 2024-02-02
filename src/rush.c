@@ -6,13 +6,8 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
-// print error message to user
-void printError()
-{
-	char error_message[30] = "An error has occurred\n";
-	write(STDERR_FILENO, error_message, strlen(error_message));
-	fflush(stdout);
-}
+#define MAX_ARGS 50
+#define MAX_ARG_LENGTH 50
 
 // return the index of redirection symbol in arg list
 int findRedirectionIndex(char **args, int argCount)
@@ -27,19 +22,27 @@ int findRedirectionIndex(char **args, int argCount)
 	return -1;
 }
 
+// print error message to user
+void printError()
+{
+    char error_message[30] = "An error has occurred\n";
+    write(STDERR_FILENO, error_message, strlen(error_message));
+    fflush(stdout);
+}
+
 int main(int argc, char **argv)
 {
-	// buffer for cmd input
-	char *cmd = NULL;
-	char *arg = NULL;
+    // global variables
 	size_t cmdSize = 0;
-	size_t argCount = 0;
-	size_t pathCount = 1;
-	char ***arguments = NULL;
-	int *argCounts = NULL;
-	// allocate space for path and set initial path to /bin
-	char **path = (char **)malloc(sizeof(char *));
-	path[0] = "/bin";
+	int argCount = 0;
+	int pathCount = 1;
+    int argIdx = 0;
+    char *cmd = NULL;
+    char *arg = NULL;
+    int *argCounts = NULL;
+    char*** arguments = NULL;
+    char **path = (char **)malloc(sizeof(char *));
+    path[0] = "/bin";
 
 	// calling rush with arguments causes an error
 	if (argc > 1)
@@ -48,21 +51,23 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+    // main loop
 	while (1)
 	{
 		// prompt user for input and get that input and store in buffer
 		printf("rush> ");
 		fflush(stdout);
+
+        // get line of text and store in cmd
 		if (getline(&cmd, &cmdSize, stdin) == -1)
 		{
 			printError();
 			exit(1);
 		}
 
-		// parse input command and store into array of strings
+        // parse the cmd into tokens and store each token in array
 		char *temp = cmd;
 		argCount = 0;
-		int argIdx = 0;
 		while ((arg = strsep(&temp, " \n\t")) != NULL)
 		{
 			if (strlen(arg) > 0)
@@ -74,9 +79,11 @@ int main(int argc, char **argv)
 					continue;
 				}
 				argCount++;
-				arguments = (char ***)realloc(arguments, (argIdx + 1) * sizeof(char **));
-				arguments[argIdx] = (char **)realloc(arguments[argIdx], 50 * sizeof(char *));
-				arguments[argIdx][argCount - 1] = (char *)realloc(arguments[argIdx][argCount - 1], 50 * sizeof(char));
+
+                // resize arrays as arguments are parsed and store args into arrays
+                arguments = (char***)realloc(arguments, (argIdx + 1) * sizeof(char **));
+				arguments[argIdx] = (char **)realloc(arguments[argIdx], MAX_ARGS * sizeof(char *));
+				arguments[argIdx][argCount - 1] = (char *)realloc(arguments[argIdx][argCount - 1], MAX_ARG_LENGTH * sizeof(char));
 				arguments[argIdx][argCount - 1] = strdup(arg);
 				argCounts = (int *)realloc(argCounts, (argIdx + 1) * sizeof(int));
 				argCounts[argIdx] = argCount;
@@ -122,11 +129,14 @@ int main(int argc, char **argv)
 				}
 				pathCount = argCount - 1;
 			}
+            // attempt to execute all of the commands passed
 			else
 			{
+                // get total number of commands from parsing input
 				int numCmds = argIdx + 1;
 				pid_t pids[numCmds];
 
+                // iterate through all commands and fork processes
 				for (int i = 0; i < numCmds; i++)
 				{
 					if ((pids[i] = fork()) < 0)
@@ -136,16 +146,17 @@ int main(int argc, char **argv)
 					}
 					else if (pids[i] == 0)
 					{
-						int flag = 0;
+						int canAccessFlag = 0;
 						for (int j = 0; j < pathCount; j++)
 						{
 							char *res = strdup(path[j]);
 							strcat(res, "/");
 							strcat(res, arguments[i][0]);
 							int canAccess = access(res, X_OK);
+                            // if exe is found, fork process and check if it has redirection
 							if (canAccess == 0)
 							{
-								flag = 1;
+								canAccessFlag = 1;
 								pid_t pid = fork();
 								// check if fork failed
 								if (pid == -1)
@@ -168,15 +179,17 @@ int main(int argc, char **argv)
 										}
 										else
 										{
-											int fd = open(arguments[i][redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // Open or create the output file
-											dup2(fd, STDOUT_FILENO);														 // Redirect stdout to the file
-											close(fd);																		 // Close the file descriptor
+                                            // open or create the output file and redirect stdout
+											int fd = open(arguments[i][redirIndex + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+											dup2(fd, STDOUT_FILENO);
+											close(fd);
 											arguments[i][redirIndex] = NULL;
 											arguments[i][redirIndex + 1] = NULL;
 										}
 									}
 									else
 									{
+                                        // check that multiple redirection symbols were inputted and report as error
 										for (int h = 0; h < argCounts[i]; h++)
 										{
 											if (arguments[i][h][0] == '>')
@@ -186,6 +199,7 @@ int main(int argc, char **argv)
 											}
 										}
 									}
+                                    // execute cmd with arguments list
 									int error = execv(res, arguments[i]);
 									if (error == -1)
 									{
@@ -202,15 +216,16 @@ int main(int argc, char **argv)
 								}
 							}
 						}
-						if (flag == 0)
+						if (canAccessFlag == 0)
 						{
 							printError();
 						}
+                        // important to call exit here so children do not loop again and fork grandchildren
 						exit(0);
 					}
 				}
 
-				/* Wait for children to exit. */
+				// wait for all children to exit
 				int status;
 				pid_t p;
 				while (numCmds > 0)
@@ -220,7 +235,7 @@ int main(int argc, char **argv)
 				}
 			}
 
-			// clear arguments after process has run
+			// set arguments to NULL to use again in the next iteration
 			for (int i = 0; i < argIdx + 1; i++)
 			{
 				for (int j = 0; j < argCounts[i]; j++)
